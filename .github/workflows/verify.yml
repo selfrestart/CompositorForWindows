@@ -98,7 +98,19 @@ jobs:
         run: dotnet build Compositor.sln -c Release
 
       - name: Test
-        run: dotnet test Compositor.sln -c Release
+        shell: pwsh
+        run: |
+          # --diagnostic makes the Microsoft.Testing.Platform host write a crash dump and a host log
+          # when the process dies before reporting anything. The first CI run failed here with only
+          # "Tests failed" and an empty test log, which named no test and no cause; this is what turns
+          # that into something diagnosable.
+          dotnet test Compositor.sln -c Release -- --diagnostic --diagnostic-verbosity trace
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '--- diagnostic output ---'
+            Get-ChildItem -Recurse -File -Path . -Include *.log,*.dmp,*.txt -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match 'TestResults|diagnostic' } |
+              Select-Object -First 20 FullName, Length | Format-Table -AutoSize
+          }
 
       - name: Upload test results
         if: always()
@@ -108,6 +120,7 @@ jobs:
           path: |
             tests/**/TestResults/
             tests/**/*.log
+            **/TestResults/**
           retention-days: 7
           if-no-files-found: ignore
 

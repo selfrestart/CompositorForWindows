@@ -12,10 +12,11 @@
     <PackageReference Include="SkiaSharp" Version="2.88.9" />
 
     <!-- SkiaSharp's own package carries the Windows and macOS native libraries but not the Linux
-         one, so without this the ubuntu CI job fails at the first decode. It is marked
-         PrivateAssets="all" so it never reaches a shipping package: it exists only so the
-         platform-neutral tests can run on Linux. -->
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.9" PrivateAssets="all" />
+         one, so without this the ubuntu CI job fails at the first decode with
+         "Unable to load shared library 'libSkiaSharp'". It must NOT be marked PrivateAssets=all:
+         that stops it reaching Compositor.Tests, which is the project that actually runs the
+         decodes, and the CI run showed exactly that: 77 failures, every one a DllNotFoundException. -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.9" />
   </ItemGroup>
 
   <ItemGroup>
