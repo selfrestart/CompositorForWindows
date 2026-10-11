@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Parity tests for the native C pixel kernel. xUnit v3 (Assert.Skip lets a missing
+       native build skip rather than fail). No Windows API: this project must also run on
+       ubuntu-latest, where the native library is libcompositor_pixels.so. -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- xUnit v3 test projects are self-hosting executables; the generated entry point runs the suite. -->
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Compositor.Tests</RootNamespace>
+    <!-- xUnit v3 runs on Microsoft.Testing.Platform. Without this, `dotnet test` silently discovers
+         and runs nothing (it exits 0 with no summary) because the VSTest path is not the one the
+         project is built for. -->
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- xUnit v3 rather than v2: this machine restores from nuget.org, and v3 is what gives
+         Assert.Skip, so a missing native library is reported as `skipped` in the test summary
+         instead of silently counted as passed. -->
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Compositor.Core\Compositor.Core.csproj" />
+    <ProjectReference Include="..\..\src\Compositor.Pixels\Compositor.Pixels.csproj" />
+    <ProjectReference Include="..\..\src\Compositor.Codecs\Compositor.Codecs.csproj" />
+  </ItemGroup>
+
+</Project>

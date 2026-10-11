@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- PNG codec and the CPU compositor.
+       SkiaSharp is used for image codecs only: it is cross-platform, so this project still builds
+       and tests on ubuntu-latest, and its license (MIT) matches the upstream project's. -->
+
+  <PropertyGroup>
+    <RootNamespace>Compositor.Codecs</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+
+    <!-- SkiaSharp's own package carries the Windows and macOS native libraries but not the Linux
+         one, so without this the ubuntu CI job fails at the first decode. It is marked
+         PrivateAssets="all" so it never reaches a shipping package: it exists only so the
+         platform-neutral tests can run on Linux. -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.9" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Compositor.Core\Compositor.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The blend functions and the non-separable helpers are internal because callers should go
+         through LayerCompositor. The tests assert them directly: the numbers they produce are the
+         sharpest check on the whole formulation (see BlendMathTests). -->
+    <InternalsVisibleTo Include="Compositor.Tests" />
+  </ItemGroup>
+
+</Project>

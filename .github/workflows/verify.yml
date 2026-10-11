@@ -1,0 +1,92 @@
+# Compositor Windows 移植 · CI
+#
+# Two jobs, mirroring the upstream split (.github/workflows/verify.yml):
+#   * portable — Compositor.Core and Compositor.Pixels on ubuntu-latest. This is the load-bearing
+#     job: those two projects must never reference a Windows API, and running them on Linux is the
+#     cheapest way to keep that true (docs/port/wave0-contracts.md §1).
+#   * windows  — the full solution plus the native kernel and its parity tests.
+#
+# The native kernel is built with gcc on Linux and MinGW on Windows; see
+# native/compositor_pixels/build.sh and build.ps1.
+
+name: Verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    name: portable (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build the native kernel
+        run: bash native/compositor_pixels/build.sh
+
+      - name: Build the portable projects
+        run: >
+          dotnet build
+          src/Compositor.Core/Compositor.Core.csproj
+          src/Compositor.Pixels/Compositor.Pixels.csproj
+          src/Compositor.Codecs/Compositor.Codecs.csproj
+          -c Release
+
+      - name: Test
+        run: dotnet test tests/Compositor.Tests/Compositor.Tests.csproj -c Release --logger "console;verbosity=normal"
+
+      - name: Prove no Windows API leaked into the portable half
+        run: |
+          set -euo pipefail
+          # Compiled above on Linux, which is the real proof. This catches the obvious regressions
+          # early and by name, so a failure explains itself.
+          pattern='Microsoft\.Windows\.|System\.Windows\.|net8\.0-windows|DllImport\("user32|DllImport\("gdi32|DllImport\("kernel32'
+          if grep -rEn "$pattern" src/Compositor.Core src/Compositor.Pixels src/Compositor.Codecs; then
+            echo "::error::A Windows-only reference appeared in a portable project."
+            exit 1
+          fi
+          echo "Portable projects are clean."
+
+  windows:
+    name: windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build the native kernel
+        shell: pwsh
+        run: ./native/compositor_pixels/build.ps1 -Toolchain msvc
+
+      - name: Build
+        run: dotnet build Compositor.sln -c Release
+
+      - name: Test
+        run: dotnet test Compositor.sln -c Release --logger "console;verbosity=normal"
+
+      - name: Upload native build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-build-logs
+          path: native/compositor_pixels/logs/
+          retention-days: 7
+          if-no-files-found: ignore

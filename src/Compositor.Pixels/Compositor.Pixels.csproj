@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The native C pixel kernels (native/compositor_pixels) behind a C ABI.
+       Platform-neutral on the managed side: the .c sources build on any OS with a C compiler,
+       so this project is built and tested on ubuntu-latest in CI too.
+
+       The DLL is loaded lazily on first use, so a missing native build skips the parity tests
+       rather than crashing the whole suite. -->
+
+  <PropertyGroup>
+    <RootNamespace>Compositor.Pixels</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NativeLibraryName>compositor_pixels</NativeLibraryName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The raw [LibraryImport] surface stays internal: wave0-contracts.md section 3.1 freezes only
+         NativeKernel.IsAvailable as public, and callers are meant to go through it. The parity tests
+         still have to call every one of the 42 entry points directly, so the test assembly is named
+         as a friend rather than the ABI being made public. -->
+    <InternalsVisibleTo Include="Compositor.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The native library, produced by native/compositor_pixels/build.ps1. -->
+    <None Include="$(MSBuildThisFileDirectory)..\..\native\compositor_pixels\build\bin\compositor_pixels.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="compositor_pixels.dll"
+          Condition="Exists('$(MSBuildThisFileDirectory)..\..\native\compositor_pixels\build\bin\compositor_pixels.dll')" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\native\compositor_pixels\build\bin\libcompositor_pixels.so"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="libcompositor_pixels.so"
+          Condition="Exists('$(MSBuildThisFileDirectory)..\..\native\compositor_pixels\build\bin\libcompositor_pixels.so')" />
+  </ItemGroup>
+
+</Project>

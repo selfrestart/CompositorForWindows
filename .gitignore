@@ -1,0 +1,34 @@
+# Build output
+bin/
+obj/
+build/
+*.user
+
+# The upstream macOS checkout is a read-only reference, not part of this repository.
+src/Compositor/
+
+# Spike scratch space: the spike itself is kept (it is the reproducible reference), but its
+# build products and probe scratch directories are not.
+spikes/**/build/
+spikes/**/bin/
+spikes/**/obj/
+spikes/**/_net/
+
+# Native build products and diagnostics. The .c/.h sources and the build scripts are tracked;
+# everything the build emits is not. The parity diagnostics alone are ~11 MB per run.
+native/**/build/
+native/**/logs/
+native/**/probe/bin/
+native/**/probe/obj/
+*.dll
+*.a
+*.o
+
+# Test and log output
+TestResults/
+*.trx
+*.log
+
+# OS noise
+.DS_Store
+Thumbs.db

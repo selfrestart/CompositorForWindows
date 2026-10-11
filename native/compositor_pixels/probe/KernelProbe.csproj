@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    KernelProbe for native/compositor_pixels. Ported from
+    spikes/c-kernel/KernelProbe/KernelProbe.csproj; the ten checks are unchanged.
+
+    TargetFramework comes from the repository Directory.Build.props (net8.0), and the
+    repository-root nuget.config already clears the broken machine-wide
+    fallbackPackageFolders list (docs/port/wave0-contracts.md section 0), so no
+    per-project nuget.config is needed here.
+
+    DllImport is deliberate: the probe is a test harness, and its call sites are
+    identical to the spike's so the two runs are directly comparable. SYSLIB1054
+    ("use LibraryImport") is silenced for that reason; the production bindings in
+    src/Compositor.Pixels use LibraryImport.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>KernelProbe</AssemblyName>
+    <RootNamespace>KernelProbe</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);SYSLIB1054</NoWarn>
+    <!-- The C kernel is plain C ABI (cdecl); no marshalling attributes needed. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

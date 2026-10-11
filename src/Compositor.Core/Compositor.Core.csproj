@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Platform-neutral document core: the .comp format, the layer model, and the limits.
+       NO Windows API here. This project is built and tested on ubuntu-latest in CI. -->
+
+  <PropertyGroup>
+    <RootNamespace>Compositor.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>
