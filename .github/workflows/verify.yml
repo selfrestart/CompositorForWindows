@@ -39,15 +39,33 @@ jobs:
         run: bash native/compositor_pixels/build.sh
 
       - name: Build the portable projects
-        run: >
-          dotnet build
-          src/Compositor.Core/Compositor.Core.csproj
-          src/Compositor.Pixels/Compositor.Pixels.csproj
-          src/Compositor.Codecs/Compositor.Codecs.csproj
-          -c Release
+        run: |
+          set -euo pipefail
+          # One project per invocation: `dotnet build a.csproj b.csproj c.csproj` fails with
+          # MSB1008, and a folded YAML scalar joins the lines into exactly that.
+          for project in \
+            src/Compositor.Core/Compositor.Core.csproj \
+            src/Compositor.Pixels/Compositor.Pixels.csproj \
+            src/Compositor.Codecs/Compositor.Codecs.csproj
+          do
+            dotnet build "$project" -c Release
+          done
 
       - name: Test
-        run: dotnet test tests/Compositor.Tests/Compositor.Tests.csproj -c Release --logger "console;verbosity=normal"
+        run: dotnet test tests/Compositor.Tests/Compositor.Tests.csproj -c Release
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-test-results
+          # The xUnit v3 run log is written beside the test assembly. Without it a process-level
+          # failure says only "Tests failed" and names no test.
+          path: |
+            tests/**/TestResults/
+            tests/**/*.log
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Prove no Windows API leaked into the portable half
         run: |
@@ -80,13 +98,26 @@ jobs:
         run: dotnet build Compositor.sln -c Release
 
       - name: Test
-        run: dotnet test Compositor.sln -c Release --logger "console;verbosity=normal"
+        run: dotnet test Compositor.sln -c Release
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-results
+          path: |
+            tests/**/TestResults/
+            tests/**/*.log
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload native build logs
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: native-build-logs
-          path: native/compositor_pixels/logs/
+          path: |
+            native/compositor_pixels/logs/
+            native/compositor_pixels/build/bin/*.def
           retention-days: 7
           if-no-files-found: ignore

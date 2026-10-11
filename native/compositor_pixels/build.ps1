@@ -156,8 +156,11 @@ Then re-run:  pwsh -File build.ps1 -Toolchain msvc
 
 # ---------------------------------------------------------------- 3. verify exports
 Write-Host '=== [3/3] verify the DLL export table ===' -ForegroundColor Cyan
-$objdump = Join-Path (Split-Path -Parent $cc) 'objdump.exe'
-if (-not (Test-Path $objdump)) { $objdump = 'D:\tdm-gcc\bin\objdump.exe' }
+# $cc is only set by the gcc branch; the MSVC branch leaves it unset, so asking for its directory
+# unconditionally raised "Cannot bind argument to parameter 'Path' because it is an empty string" on
+# every MSVC build. Absent a compiler path there is simply no objdump to look beside.
+$objdump = if ($cc) { Join-Path (Split-Path -Parent $cc) 'objdump.exe' } else { $null }
+if (-not $objdump -or -not (Test-Path $objdump)) { $objdump = 'D:\tdm-gcc\bin\objdump.exe' }
 $exportLog = Join-Path $Logs 'exports.txt'
 if (Test-Path $objdump) {
     # The export table of the linked PE, not the .def we asked for: this is the artifact.
