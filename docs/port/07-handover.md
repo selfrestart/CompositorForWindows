@@ -29,6 +29,8 @@
 
 ## 2. 三条硬阻塞（按价值排序）
 
+> **2026-10-11 更新：仓库已建并推送，CI 已跑三轮。** 见下面"阻塞 B"的新内容——`ubuntu-latest` 与 `windows-latest` 都已暴露**本机永远不会出现**的真实缺陷。
+
 ### 阻塞 A：macOS 黄金样本 —— 一份文件能关掉四项未决
 
 **需要的东西**：一个在 macOS 上真实产出的 `.comp` 工程 + 它导出的 PNG。
@@ -42,15 +44,29 @@
 
 **怎么拿**：向上游作者索取，或自己在 Mac 上做一份。这是纯外部依赖，本机无法自产。
 
-### 阻塞 B：CI 从未真跑
+### 阻塞 B：CI —— 仓库已建，两个平台各有残留
 
-本机**无法验证 Linux 路径**（Docker Desktop 未安装、WSL 无发行版）。`.github/workflows/verify.yml` 已写好但没有远端仓库。
+仓库：**https://github.com/selfrestart/CompositorForWindows**（public）。三轮 CI 的结果：
 
-**怎么解开**：建一个 GitHub 仓库并推送。`gh` 已登录为 `selfrestart`。**需要用户决定仓库名与可见性**（我没有擅自创建公开仓库）。
+**已修好的（都是本机永远测不到的）：**
 
-**风险**：CI 里有两处我无法本地验证的假设——
-- `windows-latest` 上的 `build.ps1 -Toolchain msvc` 分支（本机无 MSVC）
-- `ubuntu-latest` 上的 SkiaSharp Linux 原生库（已补 `SkiaSharp.NativeAssets.Linux`，但未实测）
+1. **`.gitattributes` 的规则顺序**。Git 用**最后匹配**的规则。我最初把通配写在例外之后，`-text` 被覆盖。证据：一个 70,306 字节的源文件暂存成 68,931 字节，差值恰好等于它的 1,375 个 CRLF——而这会让 CI 编译的**不是**被验证过的那份文件，逐字节相同的证据会作废。
+2. **`core.autocrlf=true`**。这台机器上一直是它把上游的 LF 变成 CRLF。**意味着"spike 副本与上游逐字节相同"这个证据此前是在跨换行的比对上成立的。** 已全局关闭，重新克隆后确认 spike 副本与上游一致。
+3. **`diff_vs_upstream.py` 硬编码了 CRLF**（`split(CRLF)`）。它把 `\r\n` 当作上游的形态——那是本机的产物。**在 Linux CI 上（以及任何正常检出上）第 2 步验证必然失败。** 已改为内部统一 `\n`。
+4. **控制台编码**。报告里含 U+2212，Windows 控制台默认代码页无法编码，打印即抛 `UnicodeEncodeError`——**在通过的代码树上失败**。已在脚本内强制 UTF-8 流。
+5. **ubuntu 的 `MSB1008`**：折叠的 YAML 标量把三个工程路径拼成一条命令。
+6. **ubuntu 的 77 个 `DllNotFoundException`**：我给 `SkiaSharp.NativeAssets.Linux` 加了 `PrivateAssets="all"`，导致它传不到真正做解码的 `Compositor.Tests`。
+7. **`build.ps1` 的 `Split-Path` 空路径**：MSVC 分支从不设置 `$cc`，于是每次 MSVC 构建都报错并跳过导出验证。
+
+**未解决（两个平台各一个）：**
+
+1. **windows：`AccessViolationException`，在原生代码里。** 测试宿主启动约 5 秒后死亡，一条测试都没报告。已加 `DOTNET_DbgEnableMiniDump` 与 `--diagnostic` 捕获转储，下次运行会给出触发它的具体调用。
+   - **注意**：MSVC 分支**本身是成功的**——`0 Error(s)`、42 个入口点、DLL 已产出。`build.ps1` 里那句 "NOT VERIFIED ON THIS MACHINE" 已被真实 CI 推翻，可以去掉这个警告了。
+2. **ubuntu：1 个测试失败**（407 中 406 通过）。`HealCoverageBounds_ReportsFullCoverage` 期望 `[0,0,32,24]`，得到 `[0,0,0,0]`。
+   - **根因是跨平台 ABI 差异**：`RemainingEntryPointTests.cs:208` 的注释写着「4-byte ints because the C parameter is `long`, which is 32-bit on Windows」。**Linux 上 `long` 是 8 字节**，所以内核往 16 字节的缓冲区里写了 32 字节——**这是 Linux 上的缓冲区越界**，只是恰好表现为断言失败而非崩溃。
+   - **修法**（下一轮做）：需要一个可移植性 shim，把 `heal_coverage_bounds`、`wand_trace`、`wand_mask`、`color_range_mask` 的 C `long` 收窄为 `int32_t`。改 `csrc/` 会让它与上游不再逐字节相同，所以正确做法是加一个包装头（`portab.h`）在这些函数的边界上做转换，或改用 `<stdint.h>` 的固定宽度类型并接受这一步的分叉。
+
+**留下的空白**：`Compositor.Core` 与 `Compositor.Codecs` 是平台无关的，但 `Compositor.Pixels` 的绑定对 `long` 的宽度做了平台假设。要么把绑定做成真正可移植的，要么明确只支持 Windows 并把 Linux CI 范围缩到前两个工程。
 
 ### 阻塞 C：UI 层（占总成本 36–38%，一行未写）
 

@@ -99,16 +99,21 @@ jobs:
 
       - name: Test
         shell: pwsh
+        env:
+          # The test host dies with an AccessViolationException raised inside native code, so the
+          # managed stack says nothing about which test triggered it. These make the runtime write a
+          # minidump and flush the managed stacks at the point of the fault, which is the only way to
+          # get from "something in the kernel" to a specific call.
+          DOTNET_DbgEnableMiniDump: '1'
+          DOTNET_DbgMiniDumpType: '2'
+          DOTNET_DbgMiniDumpName: '${{ github.workspace }}/crashdump.%p.dmp'
+          DOTNET_EnableCrashReport: '1'
         run: |
-          # --diagnostic makes the Microsoft.Testing.Platform host write a crash dump and a host log
-          # when the process dies before reporting anything. The first CI run failed here with only
-          # "Tests failed" and an empty test log, which named no test and no cause; this is what turns
-          # that into something diagnosable.
           dotnet test Compositor.sln -c Release -- --diagnostic --diagnostic-verbosity trace
           if ($LASTEXITCODE -ne 0) {
-            Write-Host '--- diagnostic output ---'
-            Get-ChildItem -Recurse -File -Path . -Include *.log,*.dmp,*.txt -ErrorAction SilentlyContinue |
-              Where-Object { $_.FullName -match 'TestResults|diagnostic' } |
+            Write-Host '--- looking for diagnostics ---'
+            Get-ChildItem -Recurse -File -Path . -Include *.dmp,*.log,*.txt -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match 'TestResults|diagnostic|crashdump' } |
               Select-Object -First 20 FullName, Length | Format-Table -AutoSize
           }
 
@@ -121,6 +126,8 @@ jobs:
             tests/**/TestResults/
             tests/**/*.log
             **/TestResults/**
+            crashdump.*.dmp
+            **/crashdump*
           retention-days: 7
           if-no-files-found: ignore
 
